@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comment Star Rater & Sentiment Operator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper: #F4F6F2;
+    --paper-raised: rgba(255, 255, 255, 0.88);
+    --ink: #18221B;
+    --ink-soft: #5A6960;
+    --line: #E1E5DC;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.08);
+
+    --star: #D98E04;
+    --star-empty: #D1D6CC;
+
+    --r1: #C93B2B;
+    --r2: #D96B27;
+    --r3: #B8862E;
+    --r4: #5A9148;
+    --r5: #2E6B3B;
+
+    --bg-pos: rgba(46, 107, 59, 0.08);
+    --text-pos: #22522D;
+    --bg-neu: rgba(184, 134, 46, 0.1);
+    --text-neu: #825C17;
+    --bg-neg: rgba(201, 59, 43, 0.08);
+    --text-neg: #942518;
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    box-sizing: border-box;
+  }
+
+  [data-theme="dark"] {
+    --paper: #0F1310;
+    --paper-raised: rgba(26, 32, 28, 0.85);
+    --ink: #ECF0EA;
+    --ink-soft: #8E9E93;
+    --line: #29322B;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.4);
+
+    --star: #E0A638;
+    --star-empty: #2E3830;
+
+    --r1: #E05244;
+    --r2: #EC7E3A;
+    --r3: #D8AE58;
+    --r4: #73AA60;
+    --r5: #47A358;
+
+    --bg-pos: rgba(71, 163, 88, 0.15);
+    --text-pos: #6EDB80;
+    --bg-neu: rgba(216, 174, 88, 0.15);
+    --text-neu: #E8C478;
+    --bg-neg: rgba(224, 82, 68, 0.15);
+    --text-neg: #FF877A;
+  }
+
+  html, body { height: 100%; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  #starCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+    gap: 20px;
+  }
+
+  .title-area h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(30px, 5vw, 42px);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    background: linear-gradient(135deg, var(--ink) 30%, var(--ink-soft));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header p {
+    color: var(--ink-soft);
+    max-width: 58ch;
+    font-size: 15px;
+  }
+
+  /* Theme Toggle Button */
+  .theme-toggle {
+    background: var(--paper-raised);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 10px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--ink-soft);
+  }
+
+  .theme-toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    transition: transform 0.4s ease;
+  }
+
+  .theme-toggle:hover svg {
+    transform: rotate(20deg);
+  }
+
+  /* Input Panel with glassmorphism */
+  .panel {
+    background: var(--paper-raised);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .panel:focus-within {
+    border-color: var(--star);
+    box-shadow: var(--shadow-lg), 0 0 0 3px rgba(217, 142, 4, 0.15);
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 150px;
+    resize: vertical;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    outline: none;
+  }
+
+  textarea::placeholder {
+    color: var(--ink-soft);
+    opacity: 0.6;
+  }
+
+  .panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--line);
+    margin-top: 16px;
+    padding-top: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .hint {
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 10px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    border: none;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-bounce);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    opacity: 0.95;
+  }
+
+  button:active {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
+
+  button.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    box-shadow: none;
+  }
+
+  button.ghost:hover {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: var(--ink-soft);
+  }
+
+  [data-theme="dark"] button.ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* Results & Summary Container */
+  .summary {
+    display: none;
+    margin-top: 40px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .summary.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .stats-card {
+    background: var(--paper-raised);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .avg-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .avg-number {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    min-width: 80px;
+  }
+
+  .avg-stars {
+    font-size: 22px;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  .avg-count {
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .dist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+
+  .dist-row .label {
+    width: 36px;
+    color: var(--ink-soft);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .dist-row .track {
+    flex: 1;
+    height: 10px;
+    background: var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .dist-row .fill {
+    height: 100%;
+    border-radius: 20px;
+    width: 0%;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .dist-row .num {
+    width: 32px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+
+  /* Filter Tabs */
+  .filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .filters button {
+    background: var(--paper-raised);
+    backdrop-filter: blur(8px);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    padding: 8px 16px;
+    font-size: 13.5px;
+    border-radius: 20px;
+    box-shadow: none;
+    transition: all var(--transition-fast);
+  }
+
+  .filters button:hover {
+    color: var(--ink);
+    border-color: var(--ink-soft);
+  }
+
+  .filters button.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  #list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Animated Comment Card */
+  .card {
+    background: var(--paper-raised);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    font-size: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+    animation: cardEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .card:hover {
+    transform: translateY(-2px) scale(1.002);
+    box-shadow: var(--shadow-md);
+  }
+
+  @keyframes cardEntrance {
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .card-text {
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.55;
+    word-break: break-word;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+  }
+
+  /* Sentiment Badges */
+  .badge {
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .badge.positive {
+    background: var(--bg-pos);
+    color: var(--text-pos);
+  }
+
+  .badge.neutral {
+    background: var(--bg-neu);
+    color: var(--text-neu);
+  }
+
+  .badge.negative {
+    background: var(--bg-neg);
+    color: var(--text-neg);
+  }
+
+  .card .stars {
+    font-size: 16px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .empty-note {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    font-style: italic;
+    padding: 30px;
+    text-align: center;
+    background: var(--paper-raised);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+  }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 24px 16px 60px; }
+    header { flex-direction: column; align-items: flex-start; }
+    .theme-toggle { align-self: flex-end; margin-top: -40px; }
+    .panel-foot { flex-direction: column; align-items: stretch; }
+    .btn-group { width: 100%; }
+    .btn-group button { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starCanvas"></canvas>
+
+<div class="wrap">
+  <header>
+    <div class="title-area">
+      <h1>Comment star rater</h1>
+      <p>Paste comments from any site, app, or feedback form. Each one is automatically classified into a 1–5 star rating using smart sentiment analysis right in your browser.</p>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle Theme">
+      <svg id="themeIcon" viewBox="0 0 24 24">
+        <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+      </svg>
+      <span id="themeLabel">Dark Mode</span>
+    </button>
+  </header>
+
+  <div class="panel">
+    <textarea id="input" placeholder="Great battery life, lasts two days easily.&#10;Broke after a week, total waste of money.&#10;Decent for the price, nothing special.&#10;Customer service was super fast and friendly!"></textarea>
+    <div class="panel-foot">
+      <span class="hint" id="hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        One comment per line
+      </span>
+      <div class="btn-group">
+        <button class="ghost" id="sampleBtn" type="button">Load example</button>
+        <button id="sortBtn" type="button">
+          <span>Rate comments</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="stats-card">
+      <div class="avg-row">
+        <div class="avg-number" id="avgNumber">0.0</div>
+        <div>
+          <div class="avg-stars" id="avgStars"></div>
+          <div class="avg-count" id="avgCount">0 comments rated</div>
+        </div>
+      </div>
+
+      <div class="dist" id="dist"></div>
+    </div>
+
+    <div class="filters" id="filters"></div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+(function setupStarBackground() {
+  var canvas = document.getElementById('starCanvas');
+  var ctx = canvas.getContext('2d');
+  var stars = [];
+  var numStars = 45;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function drawStar(cx, cy, spikes, outerRadius, innerRadius, color, alpha, rotation) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotation);
+    var step = Math.PI / spikes;
+
+    for (var i = 0; i < 2 * spikes; i++) {
+      var r = (i % 2 === 0) ? outerRadius : innerRadius;
+      var x = Math.cos(i * step) * r;
+      var y = Math.sin(i * step) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(217, 142, 4, 0.6)";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function Star() {
+    this.reset(true);
+  }
+
+  Star.prototype.reset = function(initial) {
+    this.x = Math.random() * canvas.width;
+    this.y = initial ? Math.random() * canvas.height : -30;
+    this.size = Math.random() * 12 + 6;
+    this.speedY = Math.random() * 1.2 + 0.6;
+    this.speedX = (Math.random() - 0.5) * 0.4;
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random() - 0.5) * 0.02;
+    this.opacity = Math.random() * 0.6 + 0.3;
+    this.twinkleSpeed = Math.random() * 0.03 + 0.01;
+    this.twinkleFactor = Math.random() * Math.PI;
+  };
+
+  for (var i = 0; i < numStars; i++) {
+    stars.push(new Star());
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var starColor = isDark ? "#E0A638" : "#D98E04";
+
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      s.y += s.speedY;
+      s.x += s.speedX;
+      s.rotation += s.rotSpeed;
+      s.twinkleFactor += s.twinkleSpeed;
+
+      var currentAlpha = s.opacity + Math.sin(s.twinkleFactor) * 0.2;
+      currentAlpha = Math.max(0.1, Math.min(0.8, currentAlpha));
+
+      drawStar(s.x, s.y, 5, s.size, s.size / 2.2, starColor, currentAlpha, s.rotation);
+
+      if (s.y > canvas.height + 30 || s.x < -30 || s.x > canvas.width + 30) {
+        s.reset(false);
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+})();
+
+(function () {
+  var POS = ("good great excellent amazing awesome fantastic wonderful perfect love loved loving " +
+    "happy pleased satisfied impressed recommend recommended reliable durable sturdy solid comfortable " +
+    "easy fast quick smooth sharp clear crisp beautiful gorgeous sleek stylish affordable value worth " +
+    "helpful friendly professional responsive quality premium best better improved works working " +
+    "efficient convenient intuitive seamless flawless outstanding superb brilliant delightful exceeded " +
+    "exceeds nice good-looking sturdy lightweight powerful fresh clean bright long-lasting genuine " +
+    "authentic thank thanks glad enjoy enjoyed enjoying favorite favourite top solid comfy cozy").split(" ");
+
+  var NEG = ("bad terrible awful horrible poor worst hate hated hating disappointing disappointed " +
+    "disappoints broken break breaks broke damaged defective faulty useless waste junk cheap flimsy " +
+    "slow late delayed missing wrong rude unresponsive unhelpful annoying frustrating frustrated " +
+    "regret regretted overpriced expensive scam fake fraud misleading unreliable uncomfortable " +
+    "difficult confusing complicated buggy glitchy crashed crashes lag laggy stuck stopped died " +
+    "leaking cracked torn stained smell smelly noisy loud cheaply thin flimsy return returned " +
+    "refund complaint complain never again avoid don't wouldn't shouldn't stop").split(" ");
+
+  var NEGATORS = ["not", "no", "never", "n't", "without", "hardly", "barely", "isn't", "wasn't",
+    "aren't", "weren't", "don't", "doesn't", "didn't", "won't", "can't", "couldn't", "wouldn't"];
+
+  var INTENSIFIERS = { "very": 1.5, "extremely": 1.8, "really": 1.3, "so": 1.3, "super": 1.5,
+    "totally": 1.4, "absolutely": 1.7, "completely": 1.5, "incredibly": 1.6 };
+
+  var posSet = {}, negSet = {};
+  POS.forEach(function (w) { posSet[w] = true; });
+  NEG.forEach(function (w) { negSet[w] = true; });
+
+  var STAR_COLORS = {
+    1: "var(--r1)",
+    2: "var(--r2)",
+    3: "var(--r3)",
+    4: "var(--r4)",
+    5: "var(--r5)"
+  };
+
+  var currentTheme = localStorage.getItem('theme') || 'light';
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    var label = document.getElementById('themeLabel');
+    var icon = document.getElementById('themeIcon');
+    if (theme === 'dark') {
+      label.textContent = 'Light Mode';
+      icon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>';
+    } else {
+      label.textContent = 'Dark Mode';
+      icon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
+    }
+    localStorage.setItem('theme', theme);
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    currentTheme = (currentTheme === 'light') ? 'dark' : 'light';
+    applyTheme(currentTheme);
+  });
+  applyTheme(currentTheme);
+
+  function tokenize(text) {
+    return text.toLowerCase().replace(/[^a-z0-9'\s]/g, " ").split(/\s+/).filter(Boolean);
+  }
+
+  function scoreComment(text) {
+    var tokens = tokenize(text);
+    var score = 0;
+    for (var i = 0; i < tokens.length; i++) {
+      var w = tokens[i];
+      var isPos = !!posSet[w], isNeg = !!negSet[w];
+      if (!isPos && !isNeg) continue;
+      var weight = isPos ? 1 : -1;
+      var negated = false, intensity = 1;
+      for (var j = Math.max(0, i - 3); j < i; j++) {
+        if (NEGATORS.indexOf(tokens[j]) !== -1) negated = true;
+        if (INTENSIFIERS[tokens[j]]) intensity = INTENSIFIERS[tokens[j]];
+      }
+      if (negated) weight *= -1;
+      weight *= intensity;
+      score += weight;
+    }
+    return score;
+  }
+
+  function scoreToStars(score) {
+    var rating = Math.round(3 + score);
+    return Math.max(1, Math.min(5, rating));
+  }
+
+  function starString(n) {
+    var full = "★".repeat(n);
+    var empty = "☆".repeat(5 - n);
+    return full + empty;
+  }
+
+  function splitComments(raw) {
+    return raw.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  var currentResults = [];
+  var currentFilter = "all";
+
+  function renderList() {
+    var list = document.getElementById("list");
+    var items = currentFilter === "all"
+      ? currentResults
+      : currentResults.filter(function (r) { return r.stars === Number(currentFilter); });
+
+    list.innerHTML = "";
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-note">No comments match this rating filter.</div>';
+      return;
+    }
+
+    items.forEach(function (r, idx) {
+      var card = document.createElement("div");
+      card.className = "card";
+      card.style.animationDelay = (idx * 0.05) + "s";
+      card.style.borderLeftColor = STAR_COLORS[r.stars];
+
+      var badgeClass = "neutral";
+      var badgeText = "Neutral";
+      if (r.stars >= 4) {
+        badgeClass = "positive";
+        badgeText = "Positive";
+      } else if (r.stars <= 2) {
+        badgeClass = "negative";
+        badgeText = "Negative";
+      }
+
+      card.innerHTML =
+        '<div class="card-text">' + escapeHtml(r.text) + '</div>' +
+        '<div class="card-meta">' +
+          '<span class="badge ' + badgeClass + '">' + badgeText + '</span>' +
+          '<span class="stars" style="color:' + STAR_COLORS[r.stars] + '">' + starString(r.stars) + '</span>' +
+        '</div>';
+
+      list.appendChild(card);
+    });
+  }
+
+  function renderFilters(counts) {
+    var wrap = document.getElementById("filters");
+    wrap.innerHTML = "";
+    var opts = [["all", "All"], ["5", "5 ★"], ["4", "4 ★"], ["3", "3 ★"], ["2", "2 ★"], ["1", "1 ★"]];
+    opts.forEach(function (opt) {
+      var btn = document.createElement("button");
+      var label = opt[0] === "all" ? "All (" + currentResults.length + ")" : opt[1] + " (" + (counts[opt[0]] || 0) + ")";
+      btn.textContent = label;
+      btn.type = "button";
+      if (opt[0] === currentFilter) btn.className = "active";
+      btn.addEventListener("click", function () {
+        currentFilter = opt[0];
+        renderFilters(counts);
+        renderList();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function animateCounter(targetVal) {
+    var el = document.getElementById("avgNumber");
+    var startVal = 0;
+    var duration = 800;
+    var startTime = null;
+
+    function step(timestamp) {
+      if (!startTime) startTime = timestamp;
+      var progress = Math.min((timestamp - startTime) / duration, 1);
+      var easeProgress = 1 - Math.pow(1 - progress, 3);
+      var current = startVal + (targetVal - startVal) * easeProgress;
+      el.textContent = current.toFixed(1);
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        el.textContent = targetVal.toFixed(1);
+      }
+    }
+    window.requestAnimationFrame(step);
+  }
+
+  function render(results) {
+    currentResults = results;
+    currentFilter = "all";
+
+    var counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    var sum = 0;
+    results.forEach(function (r) { counts[r.stars]++; sum += r.stars; });
+    var avg = results.length ? sum / results.length : 0;
+
+    animateCounter(avg);
+
+    document.getElementById("avgStars").innerHTML =
+      '<span style="color:var(--star)">' + starString(Math.round(avg)) + '</span>';
+    document.getElementById("avgCount").textContent =
+      results.length + (results.length === 1 ? " comment analyzed" : " comments analyzed");
+
+    var distEl = document.getElementById("dist");
+    distEl.innerHTML = "";
+    [5, 4, 3, 2, 1].forEach(function (n) {
+      var pct = results.length ? (counts[n] / results.length * 100) : 0;
+      var row = document.createElement("div");
+      row.className = "dist-row";
+      row.innerHTML =
+        '<span class="label">' + n + ' ★</span>' +
+        '<span class="track"><span class="fill" id="bar-' + n + '" style="background:' + STAR_COLORS[n] + '"></span></span>' +
+        '<span class="num">' + counts[n] + '</span>';
+      distEl.appendChild(row);
+
+      setTimeout(function() {
+        var bar = document.getElementById('bar-' + n);
+        if (bar) bar.style.width = pct + '%';
+      }, 50);
+    });
+
+    renderFilters(counts);
+    renderList();
+
+    var summaryEl = document.getElementById("summary");
+    summaryEl.classList.add("active");
+  }
+
+  function runSort() {
+    var raw = document.getElementById("input").value;
+    var comments = splitComments(raw);
+    if (!comments.length) {
+      document.getElementById("hint").innerHTML = '<span style="color:var(--r1)">⚠️ Please paste at least one comment first</span>';
+      return;
+    } else {
+      document.getElementById("hint").innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> One comment per line';
+    }
+
+    var results = comments.map(function (text) {
+      var score = scoreComment(text);
+      return { text: text, score: score, stars: scoreToStars(score) };
+    });
+
+    render(results);
+  }
+
+  var SAMPLE = [
+    "Absolutely love this product, works perfectly every time!",
+    "Terrible experience, it broke after two days and support never replied.",
+    "Delivery was fast and packaging was solid, very happy with it.",
+    "Not worth the price, feels cheap and flimsy.",
+    "Decent for the price, does the job but nothing special.",
+    "The battery life is amazing, lasts way longer than advertised.",
+    "Extremely disappointed, completely different from the photos.",
+    "Customer service was helpful and fixed my issue quickly."
+  ].join("\n");
+
+  document.getElementById("sortBtn").addEventListener("click", runSort);
+  document.getElementById("sampleBtn").addEventListener("click", function () {
+    document.getElementById("input").value = SAMPLE;
+    runSort();
+  });
+})();
+</script>
+</body>
+</html>
